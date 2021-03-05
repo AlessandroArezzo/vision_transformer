@@ -1,5 +1,4 @@
-import torch
-from torch import nn
+from torch import nn, cat, randn
 from einops import repeat
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from einops.layers.torch import Rearrange, Reduce
@@ -11,14 +10,14 @@ class EmbeddingLayer(nn.Module):
             nn.Conv2d(channels, dim, kernel_size=patch_size, stride=patch_size),
             Rearrange('b e (h) (w) -> b (h w) e'),
         )
-        self.cls = nn.Parameter(torch.randn(1, 1, dim))
-        self.positions = nn.Parameter(torch.randn(num_patches + 1, dim))
+        self.cls = nn.Parameter(randn(1, 1, dim))
+        self.positions = nn.Parameter(randn(num_patches + 1, dim))
 
     def forward(self, x):
         batch_size = x.shape[0]
         x = self.projection(x)
         tokens = repeat(self.cls, '() n e -> b n e', b=batch_size) # genera cls tokens per tutti gli elementi del batch size
-        x = torch.cat([tokens, x], dim=1) # concatena cls tokens alle proiezioni delle patches
+        x = cat([tokens, x], dim=1) # concatena cls tokens alle proiezioni delle patches
         x += self.positions  # position embeddings aggiunti alle proiezioni
         return x
 
@@ -30,7 +29,7 @@ class ClassificationHead(nn.Sequential):
             nn.Linear(dim, n_classes))
 
 class ViT(nn.Sequential):
-    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, num_heads, feedforward_dim, channels=3, dropout=0.):
+    def __init__(self, image_size, patch_size, num_classes, dim, depth, num_heads, feedforward_dim, channels=3, dropout=0.):
         assert image_size % patch_size == 0
         num_patches = (image_size // patch_size) ** 2
         super().__init__(
@@ -39,3 +38,5 @@ class ViT(nn.Sequential):
                                                        dropout=dropout, activation="gelu"), depth),
             ClassificationHead(dim, num_classes)
         )
+
+
