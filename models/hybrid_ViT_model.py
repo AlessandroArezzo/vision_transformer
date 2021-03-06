@@ -1,10 +1,7 @@
 from einops import repeat
 from torch import nn, arange, randn, cat
-from torch.nn.modules import TransformerEncoder, TransformerEncoderLayer
 from torchvision import models
-
-from ViT_model import ClassificationHead
-
+from .ViT_model import MLPHead, TransformerEncoder
 
 class PositionalEncoding(nn.Module):
     def __init__(self, max_pos, dim, seq_length):
@@ -27,7 +24,6 @@ class HybridEmbeddingLayer(nn.Module):
         super().__init__()
         self.projection_encoding = nn.Linear(features_dim, dim)
         self.cls = nn.Parameter(randn(1, 1, dim))
-
         self.decoder_dim = int(image_size / 16.0) ** 2
         self.decoder_dim += 1
         self.positions = PositionalEncoding(
@@ -43,15 +39,16 @@ class HybridEmbeddingLayer(nn.Module):
         return x
 
 class HybridViT(nn.Module):
-
-    def __init__(self, image_size, num_classes, dim, depth, num_heads, feedforward_dim, dropout=0., backbone=None):
+    def __init__(self, image_size, num_classes, dim, depth, num_heads, feedforward_dim, dropout=0.,
+                 backbone=None):
         super().__init__()
         self.backbone = backbone
         self.backbone_model, self.features_dim = self.get_CNN_backbone()
+
         self.emb_layer = HybridEmbeddingLayer(dim=dim, image_size=image_size, features_dim=self.features_dim)
-        self.transformer = TransformerEncoder(TransformerEncoderLayer(d_model=dim, nhead=num_heads, dim_feedforward=feedforward_dim,
-                                                   dropout=dropout, activation="gelu"), depth)
-        self.mlp_head = ClassificationHead(dim, num_classes)
+        self.transformer = TransformerEncoder(dim=dim, depth=depth, num_heads=num_heads, feedforward_dim=feedforward_dim,
+                                              dropout=dropout)
+        self.mlp_head = MLPHead(dim=dim, n_classes=num_classes)
 
     def forward(self, x):
         x = self.backbone_model(x)
@@ -60,9 +57,6 @@ class HybridViT(nn.Module):
         x = self.transformer(x)
         x = self.mlp_head(x)
         return x
-
-    def get_backbone_CNN(self):
-        raise NotImplementedError("To implement in child class")
 
 class ResnetHybridViT(HybridViT):
     def __init__(self, image_size, num_classes, dim, depth, num_heads, feedforward_dim, dropout=0., backbone="resnet50"):

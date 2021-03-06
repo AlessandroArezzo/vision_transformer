@@ -1,7 +1,9 @@
-from torch import nn, cat, randn
+from torch import cat, randn
+from torch.nn import MultiheadAttention
+from einops.layers.torch import Reduce
+from torch import nn
 from einops import repeat
-from torch.nn import TransformerEncoder, TransformerEncoderLayer
-from einops.layers.torch import Rearrange, Reduce
+from einops.layers.torch import Rearrange
 
 class EmbeddingLayer(nn.Module):
     def __init__(self, patch_size, channels, dim, num_patches):
@@ -21,7 +23,53 @@ class EmbeddingLayer(nn.Module):
         x += self.positions  # position embeddings aggiunti alle proiezioni
         return x
 
-class ClassificationHead(nn.Sequential):
+class MLP(nn.Sequential):
+    def __init__(self, dim, mlp_size, dropout):
+        super().__init__(
+            nn.Linear(dim, mlp_size),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(mlp_size, dim),
+            nn.Dropout(dropout)
+        )
+
+class Norm(nn.Module):
+    def __init__(self, dim, next_block):
+        super().__init__()
+        self.next_block = next_block
+        self.norm = nn.LayerNorm(dim)
+
+    def forward(self, x, **next_block_args):
+        if isinstance(self.next_block, MultiheadAttention):
+            x = self.norm(x)
+            x = self.next_block(x, x, x)[0]
+        else:
+            x = self.next_block(self.norm(x), **next_block_args)
+        return x
+
+class ResidualConnection(nn.Module):
+    def __init__(self, previous_block):
+        super().__init__()
+        self.previous_block = previous_block
+
+    def forward(self, x, **previous_block_args):
+        residual = x
+        x = self.previous_block(x, **previous_block_args)
+        return x + residual
+
+class TransformerEncoderBlock(nn.Sequential):
+    def __init__(self, dim, num_heads, feedforward_dim, dropout=0.):
+        super().__init__(
+            ResidualConnection(Norm(dim, MultiheadAttention(embed_dim=dim, num_heads=num_heads, dropout=dropout))),
+            ResidualConnection(Norm(dim, MLP(dim=dim, mlp_size=feedforward_dim, dropout=dropout)))
+        )
+
+class TransformerEncoder(nn.Sequential):
+    def __init__(self, dim, num_heads, feedforward_dim, dropout, depth):
+        super().__init__(*[TransformerEncoderBlock(dim=dim, num_heads=num_heads,
+                                                feedforward_dim=feedforward_dim, dropout=dropout) for _ in range(depth)])
+
+class MLPHead(nn.Sequential):
     def __init__(self, dim, n_classes):
         super().__init__(
             Reduce('b n e -> b e', reduction='mean'),
@@ -34,9 +82,6 @@ class ViT(nn.Sequential):
         num_patches = (image_size // patch_size) ** 2
         super().__init__(
             EmbeddingLayer(patch_size=patch_size, channels=channels, dim=dim, num_patches=num_patches),
-            TransformerEncoder(TransformerEncoderLayer(d_model=dim, nhead=num_heads, dim_feedforward=feedforward_dim,
-                                                       dropout=dropout, activation="gelu"), depth),
-            ClassificationHead(dim, num_classes)
+            TransformerEncoder(dim=dim, depth=depth, num_heads=num_heads, feedforward_dim=feedforward_dim, dropout=dropout),
+            MLPHead(dim=dim, n_classes=num_classes)
         )
-
-
