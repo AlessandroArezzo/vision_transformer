@@ -2,7 +2,8 @@ import csv
 import os
 import sys
 
-from torch.nn.functional import log_softmax, nll_loss
+from torch.nn.functional import log_softmax, nll_loss, cross_entropy
+from torch.nn import CrossEntropyLoss
 from matplotlib import pyplot as plt
 from torch.utils.data import SubsetRandomSampler, DataLoader
 from torch import no_grad, log_softmax
@@ -18,24 +19,22 @@ from dataset import LoadTorchData
 
 def get_ViT_name(model_type, patch_size=16, hybrid=False, backbone_name="resnet50"):
     if hybrid:
-        model_name = backbone_name+"ViT-"+str(model_type)+"_"+str(patch_size)
+        model_name = backbone_name+"+ViT-"+str(model_type)+"_"+str(patch_size)
     else:
         model_name = "ViT-"+str(model_type)+"_"+str(patch_size)
     return model_name
 
 def get_ViT_model(type, image_size, patch_size, n_classes, n_channels, dropout, hybrid, backbone_name):
-    assert type == "XSmall" or type == "Small" or type == "Base" or type == "Large" or type == "Huge", \
-        "ViT type error: type permitted are 'XSmall', 'Small', 'Base', Large' and 'Huge'"
-    if type == "XSmall":
-        emb_dim, n_heads, depth, mlp_size = 32, 4, 4, 64
-    elif type == "Small":
-        emb_dim, n_heads, depth, mlp_size = 64, 8, 8, 128
-    elif type == "Base":
+    assert type == "ViT-XS" or type == "ViT-S" or type == "ViT-B" or type == "ViT-L", \
+        "ViT type error: type permitted are 'ViT-XS', 'ViT-S', 'ViT-B', 'ViT-L'"
+    if type == "ViT-XS":
+        emb_dim, n_heads, depth, mlp_size = 64, 4, 6, 128
+    elif type == "ViT-S":
+        emb_dim, n_heads, depth, mlp_size = 256, 8, 8, 512
+    elif type == "ViT-B":
         emb_dim, n_heads, depth, mlp_size = 768, 12, 12, 3072
-    elif type == "Large":
+    elif type == "ViT-L":
         emb_dim, n_heads, depth, mlp_size = 1024, 16, 24, 4096
-    elif type == "Huge":
-        emb_dim, n_heads, depth, mlp_size = 1280, 16, 32, 5120
     if hybrid:
         model = ResnetHybridViT(image_size=image_size, num_classes=n_classes,
                     dim=emb_dim, depth=depth, num_heads=n_heads,
@@ -44,11 +43,14 @@ def get_ViT_model(type, image_size, patch_size, n_classes, n_channels, dropout, 
         model = ViT(image_size=image_size, patch_size=patch_size, num_classes=n_classes,
                    channels=n_channels, dim=emb_dim, depth=depth, num_heads=n_heads,
                    feedforward_dim=mlp_size, dropout=dropout)
+        #model = ViT(image_size=image_size, patch_size=patch_size, num_classes=n_classes,
+        #           channels=n_channels, dim=emb_dim, depth=depth, heads=n_heads,
+        #           mlp_dim=mlp_size, dropout=dropout)
     return model
 
 def get_resnet_model(resnet_type, n_classes):
     assert resnet_type == "resnet18" or resnet_type == "resnet34" or resnet_type == "resnet50" or resnet_type == "resnet101" \
-           or resnet_type == "resnet150", "resnet type error"
+           or resnet_type == "resnet152", "resnet type error"
     if resnet_type == "resnet18":
         model = torchvision.models.resnet18(pretrained=False, num_classes=n_classes)
     elif resnet_type == "resnet34":
@@ -57,8 +59,8 @@ def get_resnet_model(resnet_type, n_classes):
         model = torchvision.models.resnet50(pretrained=False, num_classes=n_classes)
     elif resnet_type == "resnet101":
         model = torchvision.models.resnet101(pretrained=False, num_classes=n_classes)
-    elif resnet_type == "resnet150":
-        model = torchvision.models.resnet150(pretrained=False, num_classes=n_classes)
+    elif resnet_type == "resnet152":
+        model = torchvision.models.resnet152(pretrained=False, num_classes=n_classes)
     return model
 
 def get_output_path(root_path, model_name, data_augmentation, dataset_name):
@@ -66,7 +68,7 @@ def get_output_path(root_path, model_name, data_augmentation, dataset_name):
     if data_augmentation:
         root_path = os.path.join(root_path, "augmentation")
     else:
-        root_path = os.path.join(root_path, "natural")
+        root_path = os.path.join(root_path, "no_augmentation")
     graph_path = os.path.join(root_path, "graph")
     model_path = os.path.join(root_path, "pretrained_models")
     if not os.path.exists(model_path):
@@ -84,14 +86,14 @@ def get_transforms(augmentation, image_size):
                 torchvision.transforms.RandomCrop(image_size),
                 torchvision.transforms.RandomHorizontalFlip(),
                 torchvision.transforms.ToTensor(),
-                torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+                torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
             ]),
             'val': torchvision.transforms.Compose([
                 torchvision.transforms.Resize(int(int(image_size)), Image.BICUBIC),
                 torchvision.transforms.RandomCrop(image_size),
                 torchvision.transforms.RandomHorizontalFlip(),
                 torchvision.transforms.ToTensor(),
-                torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+                torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
             ]),
         }
     else:
@@ -99,16 +101,19 @@ def get_transforms(augmentation, image_size):
             'train': torchvision.transforms.Compose([
                 torchvision.transforms.Resize(int(int(image_size)), Image.BICUBIC),
                 torchvision.transforms.ToTensor(),
-                torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
+                torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            ]),
             'val': torchvision.transforms.Compose([
                 torchvision.transforms.Resize(int(int(image_size)), Image.BICUBIC),
                 torchvision.transforms.ToTensor(),
-                torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
+                torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            ]),
         }
     transforms['test'] = torchvision.transforms.Compose([
                 torchvision.transforms.Resize(int(int(image_size)), Image.BICUBIC),
                 torchvision.transforms.ToTensor(),
-                torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+                torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+            ])
     return transforms
 
 def get_loader_from_dataset(dataset_name, root_path, image_size, batch_size_train=128, batch_size_test=128,
@@ -149,7 +154,6 @@ def get_loader_splitting_val(train_dataset, test_dataset, batch_size_train, batc
     val_len = int(np.floor(val_ratio * dataset_len))
     validation_idx = np.random.choice(indices, size=val_len, replace=False)
     train_idx = list(set(indices) - set(validation_idx))
-
     train_sampler = SubsetRandomSampler(train_idx)
     validation_sampler = SubsetRandomSampler(validation_idx)
 
@@ -158,35 +162,37 @@ def get_loader_splitting_val(train_dataset, test_dataset, batch_size_train, batc
     validation_loader = DataLoader(train_dataset, batch_size=batch_size_train,
                                                     sampler=validation_sampler,
                                                     num_workers=n_cpu)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size_test, shuffle=True,
-                                              num_workers=n_cpu)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size_test, shuffle=True,num_workers=n_cpu)
     return train_loader, validation_loader, test_loader
 
 def evaluate(model, data_loader, device, acc_history=[], loss_history=[], mode="test"):
     model.eval()
     total_samples = len(data_loader.sampler)
+    num_batch = len(data_loader)
     correct_samples = 0
     total_loss = 0
+    criterion = CrossEntropyLoss()
     with no_grad():
         for data, target in data_loader:
             data = data.to(device)
             target = target.to(device)
             output = log_softmax(model(data), dim=1)
-            loss = nll_loss(output, target, reduction='sum')
+            #loss = nll_loss(output, target, reduction='sum')
+            #loss = cross_entropy(output, target, reduction='sum')
+            loss = criterion(output, target)
             _, pred = torch_max(output, dim=1)
             total_loss += loss.item()
             correct_samples += pred.eq(target).sum()
-    avg_loss = total_loss / total_samples
+    avg_loss = total_loss / num_batch
     accuracy = 100.0 * correct_samples / total_samples
     if mode == "validation":
         loss_history.append(avg_loss)
         acc_history.append(accuracy)
         sys.stdout.write(' %s: %.4f -- %s: %.2f \n' % ("val_loss",  avg_loss, "val_acc",  accuracy))
-    else:
-        print('\nAverage test loss: ' + '{:.4f}'.format(avg_loss) +
-          '  Accuracy:' + '{:5}'.format(correct_samples) + '/' +
-          '{:5}'.format(total_samples) + ' (' +
-          '{:4.2f}'.format(accuracy) + '%)\n')
+    #print('\nAverage test loss: ' + '{:.4f}'.format(avg_loss) +
+    #  '  Accuracy:' + '{:5}'.format(correct_samples) + '/' +
+    #  '{:5}'.format(total_samples) + ' (' +
+    #  '{:4.2f}'.format(accuracy) + '%)\n')
     return avg_loss, accuracy
 
 
@@ -201,37 +207,46 @@ def read_csv_from_path(file_path):
 
                 if model not in data.keys():
                     data[model] = {}
-                data[model][dataset] = {'#epochs': row[2], 'batch_size': row[3], 'lr': row[4],
-                                        'test_loss': row[5], 'test_acc': row[6], 'exec_time': row[7]}
+                data[model][dataset] = {'#epochs': row[2], 'batch_size': row[3], 'lr': row[4], 'optimizer': row[5],
+                                        'dropout': row[6], 'test_loss': row[7], 'test_acc': row[8], 'epoch': row[9],
+                                        'best_time': row[10], 'exec_time': row[11]}
     return data
 
 def write_on_csv(data, out_df, csv_path):
     for model in data.keys():
         for dataset in data[model].keys():
             data_to_add = [dataset, model, data[model][dataset]["#epochs"],  data[model][dataset]["batch_size"],
-                           data[model][dataset]["lr"],
-                           data[model][dataset]["test_loss"],
-                           data[model][dataset]["test_acc"], data[model][dataset]["exec_time"]]
+                           data[model][dataset]["lr"], data[model][dataset]["optimizer"],
+                           data[model][dataset]["dropout"], data[model][dataset]["test_loss"],
+                           data[model][dataset]["test_acc"], data[model][dataset]["epoch"],
+                           data[model][dataset]["best_time"], data[model][dataset]["exec_time"]]
             data_df_scores = np.hstack((np.array(data_to_add).reshape(1, -1)))
             out_df = out_df.append(pd.Series(data_df_scores.reshape(-1), index=out_df.columns),
                                    ignore_index=True)
     out_df.to_csv(csv_path, index=False, header=True)
 
-def save_result_on_csv(csv_path, model_name, dataset_name, batch_size, test_loss,
-                       lr, test_acc, n_epochs, execution_time, overwrite=False):
+def get_time_in_format(millisecond):
+    hours, rem = divmod(millisecond, 3600)
+    minutes, seconds = divmod(rem, 60)
+    return "{:0>2}:{:0>2}:{:05.2f}".format(int(hours), int(minutes), seconds)
+
+def save_result_on_csv(csv_path, model_name, dataset_name, batch_size,
+                       lr, n_epochs, execution_time, optimizer, dropout, overwrite=False, best_test_loss=0, best_test_acc=0, best_epoch=0,
+                       best_time=0):
     data = {}
     if not overwrite and os.path.isfile(csv_path):
         data = read_csv_from_path(csv_path)
-    out_df_scores = pd.DataFrame(columns=['dataset', 'model', '#epochs', 'batch_size', 'lr',
-                                          'test_loss', 'test_acc(%)', 'training_time(h)'])
+    out_df_scores = pd.DataFrame(columns=['dataset', 'model', '#epochs', 'batch_size', 'lr', 'optimizer', 'dropout',
+                                          'test_loss', 'test_acc(%)', 'epoch', 'best_time(h)', 'training_time(h)'])
     if model_name not in data.keys():
         data[model_name] = {}
-    hours, rem = divmod(execution_time, 3600)
-    minutes, seconds = divmod(rem, 60)
-    execution_time = "{:0>2}:{:0>2}:{:05.2f}".format(int(hours), int(minutes), seconds)
+    execution_time = get_time_in_format(execution_time)
+    best_time = get_time_in_format(best_time)
     data[model_name][dataset_name] = {'#epochs': str(n_epochs), 'batch_size': str(batch_size), 'lr': str(lr),
-                                      'test_loss': str( '{:.4f}'.format(test_loss)),
-                                      'test_acc': '{:4.2f}'.format(test_acc), 'exec_time': execution_time}
+                                      'optimizer': optimizer, 'dropout': str(dropout),
+                                      'test_loss': str( '{:.4f}'.format(best_test_loss)),
+                                      'test_acc': '{:4.2f}'.format(best_test_acc), 'epoch': str(best_epoch),
+                                       'best_time': best_time, 'exec_time': execution_time}
     write_on_csv(data, out_df_scores, csv_path)
 
 def train_epoch(model, optimizer, train_loader, loss_history, acc_history, device, epoch, n_epochs):
@@ -240,12 +255,15 @@ def train_epoch(model, optimizer, train_loader, loss_history, acc_history, devic
     model.train()
     sum_losses = 0
     total_correct_samples = 0
+    criterion = CrossEntropyLoss()
     for i, (data, target) in enumerate(train_loader):
         data = data.to(device)
         target = target.to(device)
         optimizer.zero_grad()
         output = log_softmax(model(data), dim=1)
-        loss = nll_loss(output, target)
+        #loss = nll_loss(output, target)
+        #loss = cross_entropy(output, target)
+        loss = criterion(output, target)
         _, pred = torch_max(output, dim=1)
         correct_samples = pred.eq(target).sum()
         accuracy = 100.0 * correct_samples / len(data)
@@ -253,7 +271,7 @@ def train_epoch(model, optimizer, train_loader, loss_history, acc_history, devic
         sum_losses += loss.item()
         loss.backward()
         optimizer.step()
-        sys.stdout.write('\rEpoch %03d/%03d [%03d/%03d] -- %s: %.4f -- %s: %.2f --' % (epoch, n_epochs, i,
+        sys.stdout.write('\rEpoch %03d/%03d [%03d/%03d] -- %s: %.4f -- %s: %.2f --' % (epoch, n_epochs, i+1,
                                                                     num_batch, "train_loss",  loss.item(),
                                                                     "train_acc",  accuracy))
     loss_history.append(sum_losses/num_batch)
@@ -281,3 +299,13 @@ def update_graph(train_loss_history, val_loss_history, train_acc_history, val_ac
     plt.legend()
     plt.savefig(acc_img_file)
     plt.close()
+
+class LambdaLR():
+    def __init__(self, n_epochs, offset, decay_start_epoch):
+        assert ((n_epochs - decay_start_epoch) > 0), "Decay must start before the training session ends!"
+        self.n_epochs = n_epochs
+        self.offset = offset
+        self.decay_start_epoch = decay_start_epoch
+
+    def step(self, epoch):
+        return 1.0 - max(0, epoch + self.offset - self.decay_start_epoch)/(self.n_epochs - self.decay_start_epoch)

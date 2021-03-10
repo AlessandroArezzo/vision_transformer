@@ -83,5 +83,6 @@ class ViT(nn.Sequential):
         super().__init__(
             EmbeddingLayer(patch_size=patch_size, channels=channels, dim=dim, num_patches=num_patches),
             TransformerEncoder(dim=dim, depth=depth, num_heads=num_heads, feedforward_dim=feedforward_dim, dropout=dropout),
+            #nn.Identity(),
             MLPHead(dim=dim, n_classes=num_classes)
         )

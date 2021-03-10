@@ -79,8 +79,8 @@ class LoadTorchData():
         self.download = download
 
     def load_dataset(self, dataset_name, batch_size_train=100, batch_size_test=1000, val_ratio=0.3, n_cpu=8, transforms=None):
-        assert dataset_name == "CIFAR-10" or dataset_name == "CIFAR-100" \
-            "Pytorch datasets permitted are: CIFAR-10, CIFAR-100 or LSUN"
+        assert dataset_name == "CIFAR-10" or dataset_name == "CIFAR-100", \
+            "Pytorch datasets permitted are: CIFAR-10, CIFAR-100"
         if not os.path.exists(self.root_path):
             os.makedirs(self.root_path)
         split_train_val = False
@@ -109,6 +109,7 @@ class LoadTorchData():
                                                                                            batch_size_train=batch_size_train,
                                                                                            batch_size_test=batch_size_test,
                                                                                            n_cpu=n_cpu)
+
         return train_loader, validation_loader, test_loader
 
 
