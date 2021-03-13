@@ -3,7 +3,7 @@ import os
 import sys
 
 from torch.nn.functional import log_softmax, nll_loss, cross_entropy
-from torch.nn import CrossEntropyLoss
+from torch.nn import CrossEntropyLoss, Sequential
 from matplotlib import pyplot as plt
 from torch.utils.data import SubsetRandomSampler, DataLoader
 from torch import no_grad, log_softmax
@@ -12,6 +12,8 @@ import numpy as np
 from PIL import Image
 import torchvision
 import pandas as pd
+from torchvision.models.resnet import conv1x1
+
 from models.ViT_model import ViT
 from models.hybrid_ViT_model import ResnetHybridViT
 from dataset import OxfordPetsDataset, OxfordFlowersDataset
@@ -19,26 +21,25 @@ from dataset import LoadTorchData
 
 def get_ViT_name(model_type, patch_size=16, hybrid=False, backbone_name="resnet50"):
     if hybrid:
-        model_name = backbone_name+"+ViT-"+str(model_type)+"_"+str(patch_size)
+        model_name = backbone_name+"+"+str(model_type)+"_"+str(patch_size)
     else:
-        model_name = "ViT-"+str(model_type)+"_"+str(patch_size)
+        model_name = str(model_type)+"_"+str(patch_size)
     return model_name
 
 def get_ViT_model(type, image_size, patch_size, n_classes, n_channels, dropout, hybrid, backbone_name):
-    assert type == "ViT-XS" or type == "ViT-S" or type == "ViT-B" or type == "ViT-L", \
-        "ViT type error: type permitted are 'ViT-XS', 'ViT-S', 'ViT-B', 'ViT-L'"
+    assert type == "ViT-XS" or type == "ViT-S" or type == "ViT-B", \
+        "ViT type error: type permitted are 'ViT-XS', 'ViT-S', 'ViT-B'"
     if type == "ViT-XS":
         emb_dim, n_heads, depth, mlp_size = 64, 4, 6, 128
     elif type == "ViT-S":
         emb_dim, n_heads, depth, mlp_size = 256, 8, 8, 512
     elif type == "ViT-B":
         emb_dim, n_heads, depth, mlp_size = 768, 12, 12, 3072
-    elif type == "ViT-L":
-        emb_dim, n_heads, depth, mlp_size = 1024, 16, 24, 4096
     if hybrid:
         model = ResnetHybridViT(image_size=image_size, num_classes=n_classes,
                     dim=emb_dim, depth=depth, num_heads=n_heads,
-                    feedforward_dim=mlp_size, dropout=dropout, backbone=backbone_name)
+                    feedforward_dim=mlp_size, dropout=dropout, backbone=backbone_name,
+                    downsample_ratio=patch_size, channels=n_channels)
     else:
         model = ViT(image_size=image_size, patch_size=patch_size, num_classes=n_classes,
                    channels=n_channels, dim=emb_dim, depth=depth, num_heads=n_heads,
@@ -83,14 +84,14 @@ def get_transforms(augmentation, image_size):
         transforms = {
             'train': torchvision.transforms.Compose([
                 torchvision.transforms.Resize(int(int(image_size)), Image.BICUBIC),
-                torchvision.transforms.RandomCrop(image_size),
+                torchvision.transforms.RandomCrop(image_size, padding=4),
                 torchvision.transforms.RandomHorizontalFlip(),
                 torchvision.transforms.ToTensor(),
                 torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
             ]),
             'val': torchvision.transforms.Compose([
                 torchvision.transforms.Resize(int(int(image_size)), Image.BICUBIC),
-                torchvision.transforms.RandomCrop(image_size),
+                torchvision.transforms.RandomCrop(image_size, padding=4),
                 torchvision.transforms.RandomHorizontalFlip(),
                 torchvision.transforms.ToTensor(),
                 torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
