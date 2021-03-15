@@ -1,9 +1,28 @@
+import torch
 from torch import cat, randn, einsum
 from torch import nn
 from einops import repeat, rearrange
 from einops.layers.torch import Rearrange
 from torch.nn.functional import pad
 
+class FixedPositionalEncoding(nn.Module):
+    def __init__(self, embedding_dim, max_length=5000):
+        super().__init__()
+
+        pe = torch.zeros(max_length, embedding_dim)
+        position = torch.arange(0, max_length, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(
+            torch.arange(0, embedding_dim, 2).float()
+            * (-torch.log(torch.tensor(10000.0)) / embedding_dim)
+        )
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        x = x + self.pe[: x.size(0), :]
+        return x
 
 class EmbeddingLayer(nn.Module):
     def __init__(self, patch_size, dim, num_patches, channels=3):
@@ -14,6 +33,7 @@ class EmbeddingLayer(nn.Module):
         )
         self.cls = nn.Parameter(randn(1, 1, dim))
         self.positions = nn.Parameter(randn(1, num_patches + 1, dim))
+        #self.positions = FixedPositionalEncoding(embedding_dim=dim)
 
     def forward(self, x):
         batch_size = x.shape[0]
@@ -21,6 +41,7 @@ class EmbeddingLayer(nn.Module):
         tokens = repeat(self.cls, '() n e -> b n e', b=batch_size) # genera cls tokens per tutti gli elementi del batch size
         x = cat((tokens, x), dim=1) # concatena cls tokens alle proiezioni delle patches
         x += self.positions[:, :(x.shape[1] + 1)] # position embeddings aggiunti alle proiezioni
+        #x = self.positions(x)
         return x
 
 class MLP(nn.Sequential):
@@ -60,16 +81,23 @@ class TransformerEncoderBlock(nn.Sequential):
         )
 
 class MultiheadAttention(nn.Module):
-    def __init__(self, dim, n_heads=8, dropout=0.):
+    def __init__(self, dim, n_heads=8, dim_head=64, dropout=0.):
         super().__init__()
         self.n_heads = n_heads
+        inner_dim = dim_head * n_heads
         self.scale = dim ** -0.5
-
+        self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
+        self.to_out = nn.Sequential(
+            nn.Linear(inner_dim, dim),
+            nn.Dropout(dropout)
+        )
+        """
         self.to_qkv = nn.Linear(dim, dim * 3, bias=False)
         self.to_out = nn.Sequential(
             nn.Linear(dim, dim),
             nn.Dropout(dropout)
         )
+        """
 
     def forward(self, x, mask = None):
         b, n, _, h = *x.shape, self.n_heads
