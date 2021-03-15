@@ -6,7 +6,7 @@ from torch.nn.functional import pad
 
 
 class EmbeddingLayer(nn.Module):
-    def __init__(self, patch_size, channels, dim, num_patches):
+    def __init__(self, patch_size, dim, num_patches, channels=3):
         super().__init__()
         self.projection = nn.Sequential(
             Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_size, p2=patch_size),

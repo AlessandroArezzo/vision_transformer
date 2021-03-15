@@ -5,40 +5,19 @@ from torchvision.models.resnet import conv1x1
 
 from .ViT_model import MLPHead, TransformerEncoder
 
-class PositionalEncoding(nn.Module):
-    def __init__(self, max_pos, dim, seq_length):
-        super().__init__()
-        self.emb = nn.Embedding(max_pos, dim)
-        self.seq_length = seq_length
-        self.register_buffer(
-            "position_ids",
-            arange(max_pos).expand((1, -1)),
-        )
-
-    def forward(self, x, pos_ids=None):
-        if pos_ids is None:
-            pos_ids = self.position_ids[:, : self.seq_length]
-        position_embeddings = self.emb(pos_ids)
-        return x + position_embeddings
-
 class HybridEmbeddingLayer(nn.Module):
     def __init__(self, dim, image_size, features_dim):
         super().__init__()
         self.projection_encoding = nn.Linear(features_dim, dim)
         self.cls = nn.Parameter(randn(1, 1, dim))
         self.decoder_dim = int(image_size / 16.0) ** 2
-        self.decoder_dim += 1
-        self.positions = PositionalEncoding(
-            self.decoder_dim, dim, self.decoder_dim
-        )
-        #self.positions = nn.Parameter(randn(1, self.decoder_dim + 1, dim))
+        self.positions = nn.Parameter(randn(1, self.decoder_dim + 1, dim))
     def forward(self, x):
         batch_size = x.shape[0]
         x = self.projection_encoding(x)
         tokens = repeat(self.cls, '() n e -> b n e', b=batch_size)
         x = cat((tokens, x), dim=1)
-        x = self.positions(x)
-        #x += self.positions[:, :(x.shape[1] + 1)] # position embeddings aggiunti alle proiezioni
+        x += self.positions[:, :(x.shape[1] + 1)]
         return x
 
 
@@ -61,6 +40,9 @@ class HybridViT(nn.Module):
         x = self.mlp_head(x[:, 0])
         return x
 
+    def get_CNN_backbone(self):
+        raise NotImplementedError("Method must be implemented in the child classes!!")
+
 class ResnetHybridViT(HybridViT):
     def __init__(self, image_size, num_classes, dim, depth, num_heads, feedforward_dim, downsample_ratio=1, dropout=0., backbone="resnet50",
                  channels=3,):
@@ -68,8 +50,8 @@ class ResnetHybridViT(HybridViT):
              #image_size/downsample_ratio, num_classes, dim, depth, num_heads, feedforward_dim, dropout, backbone
              image_size, num_classes, dim, depth, num_heads, feedforward_dim, dropout, backbone
         )
-        self.downsample = conv1x1(channels, channels, downsample_ratio)
-        self.downsample.requires_grad = False
+        #self.downsample = conv1x1(channels, channels, downsample_ratio)
+        #self.downsample.requires_grad = False
 
     def get_CNN_backbone(self):
         assert self.backbone == "resnet50", "Resnet type error: only resnet50 supported actually"

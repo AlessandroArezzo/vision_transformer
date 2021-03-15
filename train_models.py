@@ -31,6 +31,7 @@ parser.add_argument('--CUDA_VISIBLE_DEVICES', type=str, default="0", help='cuda 
 parser.add_argument('--data_augmentation',  action='store_true', help='use data augmentation')
 parser.add_argument('--evaluate_on_test',  action='store_true', help='evaluate also on data test during training')
 parser.add_argument('--cos_lr_decay',  action='store_true', help='use cosine learning rate decay')
+parser.add_argument('--weight_decay',  type=float, default=0., help='weight decay to use')
 parser.add_argument('--optimizer',  type=str, default="adam", help='optimizer to use (adam or sgd)')
 
 #Model info
@@ -71,9 +72,9 @@ if __name__ == '__main__':
         os.environ['CUDA_VISIBLE_DEVICES'] = opt.CUDA_VISIBLE_DEVICES
         model.cuda()
     if opt.optimizer == "adam":
-        optimizer = Adam(model.parameters(), lr=opt.lr)
+        optimizer = Adam(model.parameters(), lr=opt.lr, weight_decay=opt.weight_decay)
     elif opt.optimizer == "sgd":
-        optimizer = SGD(model.parameters(), lr=opt.lr, momentum=0.9)
+        optimizer = SGD(model.parameters(), lr=opt.lr, momentum=0.9, weight_decay=opt.weight_decay)
     if opt.cos_lr_decay:
         scheduler_cosine = lr_scheduler.CosineAnnealingLR(optimizer, opt.n_epochs-1)
         lr_scheduler = GradualWarmupScheduler(optimizer, multiplier=10, total_epoch=1, after_scheduler=scheduler_cosine)

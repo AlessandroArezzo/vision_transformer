@@ -2,8 +2,8 @@ import csv
 import os
 import sys
 
-from torch.nn.functional import log_softmax, nll_loss, cross_entropy
-from torch.nn import CrossEntropyLoss, Sequential
+from torch.nn.functional import log_softmax
+from torch.nn import CrossEntropyLoss
 from matplotlib import pyplot as plt
 from torch.utils.data import SubsetRandomSampler, DataLoader
 from torch import no_grad, log_softmax
@@ -12,7 +12,6 @@ import numpy as np
 from PIL import Image
 import torchvision
 import pandas as pd
-from torchvision.models.resnet import conv1x1
 
 from models.ViT_model import ViT
 from models.hybrid_ViT_model import ResnetHybridViT
@@ -21,7 +20,8 @@ from dataset import LoadTorchData
 
 def get_ViT_name(model_type, patch_size=16, hybrid=False, backbone_name="resnet50"):
     if hybrid:
-        model_name = backbone_name+"+"+str(model_type)+"_"+str(patch_size)
+        #model_name = backbone_name+"+"+str(model_type)+"_"+str(patch_size)
+        model_name = backbone_name+"+"+str(model_type)
     else:
         model_name = str(model_type)+"_"+str(patch_size)
     return model_name
@@ -44,9 +44,6 @@ def get_ViT_model(type, image_size, patch_size, n_classes, n_channels, dropout, 
         model = ViT(image_size=image_size, patch_size=patch_size, num_classes=n_classes,
                    channels=n_channels, dim=emb_dim, depth=depth, num_heads=n_heads,
                    feedforward_dim=mlp_size, dropout=dropout)
-        #model = ViT(image_size=image_size, patch_size=patch_size, num_classes=n_classes,
-        #           channels=n_channels, dim=emb_dim, depth=depth, heads=n_heads,
-        #           mlp_dim=mlp_size, dropout=dropout)
     return model
 
 def get_resnet_model(resnet_type, n_classes):
@@ -178,8 +175,6 @@ def evaluate(model, data_loader, device, acc_history=[], loss_history=[], mode="
             data = data.to(device)
             target = target.to(device)
             output = log_softmax(model(data), dim=1)
-            #loss = nll_loss(output, target, reduction='sum')
-            #loss = cross_entropy(output, target, reduction='sum')
             loss = criterion(output, target)
             _, pred = torch_max(output, dim=1)
             total_loss += loss.item()
@@ -190,10 +185,6 @@ def evaluate(model, data_loader, device, acc_history=[], loss_history=[], mode="
         loss_history.append(avg_loss)
         acc_history.append(accuracy)
         sys.stdout.write(' %s: %.4f -- %s: %.2f \n' % ("val_loss",  avg_loss, "val_acc",  accuracy))
-    #print('\nAverage test loss: ' + '{:.4f}'.format(avg_loss) +
-    #  '  Accuracy:' + '{:5}'.format(correct_samples) + '/' +
-    #  '{:5}'.format(total_samples) + ' (' +
-    #  '{:4.2f}'.format(accuracy) + '%)\n')
     return avg_loss, accuracy
 
 
@@ -214,8 +205,8 @@ def read_csv_from_path(file_path):
     return data
 
 def write_on_csv(data, out_df, csv_path):
-    for model in data.keys():
-        for dataset in data[model].keys():
+    for dataset in data.keys():
+        for model in data[dataset].keys():
             data_to_add = [dataset, model, data[model][dataset]["#epochs"],  data[model][dataset]["batch_size"],
                            data[model][dataset]["lr"], data[model][dataset]["optimizer"],
                            data[model][dataset]["dropout"], data[model][dataset]["test_loss"],
@@ -239,11 +230,11 @@ def save_result_on_csv(csv_path, model_name, dataset_name, batch_size,
         data = read_csv_from_path(csv_path)
     out_df_scores = pd.DataFrame(columns=['dataset', 'model', '#epochs', 'batch_size', 'lr', 'optimizer', 'dropout',
                                           'test_loss', 'test_acc(%)', 'epoch', 'best_time(h)', 'training_time(h)'])
-    if model_name not in data.keys():
-        data[model_name] = {}
+    if dataset_name not in data.keys():
+        data[dataset_name] = {}
     execution_time = get_time_in_format(execution_time)
     best_time = get_time_in_format(best_time)
-    data[model_name][dataset_name] = {'#epochs': str(n_epochs), 'batch_size': str(batch_size), 'lr': str(lr),
+    data[dataset_name][model_name] = {'#epochs': str(n_epochs), 'batch_size': str(batch_size), 'lr': str(lr),
                                       'optimizer': optimizer, 'dropout': str(dropout),
                                       'test_loss': str( '{:.4f}'.format(best_test_loss)),
                                       'test_acc': '{:4.2f}'.format(best_test_acc), 'epoch': str(best_epoch),
@@ -262,8 +253,6 @@ def train_epoch(model, optimizer, train_loader, loss_history, acc_history, devic
         target = target.to(device)
         optimizer.zero_grad()
         output = log_softmax(model(data), dim=1)
-        #loss = nll_loss(output, target)
-        #loss = cross_entropy(output, target)
         loss = criterion(output, target)
         _, pred = torch_max(output, dim=1)
         correct_samples = pred.eq(target).sum()
