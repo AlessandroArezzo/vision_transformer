@@ -207,11 +207,11 @@ def read_csv_from_path(file_path):
 def write_on_csv(data, out_df, csv_path):
     for dataset in data.keys():
         for model in data[dataset].keys():
-            data_to_add = [dataset, model, data[model][dataset]["#epochs"],  data[model][dataset]["batch_size"],
-                           data[model][dataset]["lr"], data[model][dataset]["optimizer"],
-                           data[model][dataset]["dropout"], data[model][dataset]["test_loss"],
-                           data[model][dataset]["test_acc"], data[model][dataset]["epoch"],
-                           data[model][dataset]["best_time"], data[model][dataset]["exec_time"]]
+            data_to_add = [dataset, model, data[dataset][model]["#epochs"],  data[dataset][model]["batch_size"],
+                           data[dataset][model]["lr"], data[dataset][model]["optimizer"],
+                           data[dataset][model]["dropout"], data[dataset][model]["test_loss"],
+                           data[dataset][model]["test_acc"], data[dataset][model]["epoch"],
+                           data[dataset][model]["best_time"], data[dataset][model]["exec_time"]]
             data_df_scores = np.hstack((np.array(data_to_add).reshape(1, -1)))
             out_df = out_df.append(pd.Series(data_df_scores.reshape(-1), index=out_df.columns),
                                    ignore_index=True)
