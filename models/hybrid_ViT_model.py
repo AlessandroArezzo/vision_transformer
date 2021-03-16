@@ -55,11 +55,14 @@ class ResnetHybridViT(HybridViT):
 
     def get_CNN_backbone(self):
         assert self.backbone == "resnet50", "Resnet type error: only resnet50 supported actually"
-        model = models.resnet50(pretrained=True)
+        #model = models.resnet50(pretrained=True)
+        model = models.resnet50(pretrained=False)
         modules = list(model.children())[:-3]
         model = nn.Sequential(*modules)
+        """
         for p in model.parameters():
             p.requires_grad = False
+        """
         features_dim = 1024
         return model, features_dim
 

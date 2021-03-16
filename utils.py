@@ -26,7 +26,7 @@ def get_ViT_name(model_type, patch_size=16, hybrid=False, backbone_name="resnet5
         model_name = str(model_type)+"_"+str(patch_size)
     return model_name
 
-def get_ViT_model(type, image_size, patch_size, n_classes, n_channels, dropout, hybrid, backbone_name):
+def get_ViT_model(type, image_size, patch_size, n_classes, n_channels, dropout, hybrid=False, backbone_name="resnet50"):
     assert type == "ViT-XS" or type == "ViT-S" or type == "ViT-B", \
         "ViT type error: type permitted are 'ViT-XS', 'ViT-S', 'ViT-B'"
     if type == "ViT-XS":
@@ -197,9 +197,9 @@ def read_csv_from_path(file_path):
                 dataset = row[0]
                 model = row[1]
 
-                if model not in data.keys():
-                    data[model] = {}
-                data[model][dataset] = {'#epochs': row[2], 'batch_size': row[3], 'lr': row[4], 'optimizer': row[5],
+                if dataset not in data.keys():
+                    data[dataset] = {}
+                data[dataset][model] = {'#epochs': row[2], 'batch_size': row[3], 'lr': row[4], 'optimizer': row[5],
                                         'dropout': row[6], 'test_loss': row[7], 'test_acc': row[8], 'epoch': row[9],
                                         'best_time': row[10], 'exec_time': row[11]}
     return data
@@ -299,3 +299,22 @@ class LambdaLR():
 
     def step(self, epoch):
         return 1.0 - max(0, epoch + self.offset - self.decay_start_epoch)/(self.n_epochs - self.decay_start_epoch)
+
+def plot_histo(values, labels, x_label, y_label, title, path_file, y_lim, color='blue'):
+    plt.bar(np.arange(len(labels)), values, color=color)
+    plt.xticks(np.arange(len(labels)), labels)
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
+    plt.title(title)
+    #plt.ylim(bottom=0)
+    figsize = (8, 6)
+    plt.savefig(path_file)
+    plt.close()
+
+def count_model_parameters(model):
+    total_params = 0
+    for name, parameter in model.named_parameters():
+        if not parameter.requires_grad: continue
+        param = parameter.numel()
+        total_params += param
+    return total_params
