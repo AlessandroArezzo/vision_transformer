@@ -52,8 +52,8 @@ elif opt.graph_type == "num_parameters":
         model = get_resnet_model(resnet_type=resnet, n_classes=10)
         n_param.append(count_model_parameters(model))
     models = vit_models + hybrid_models + resnet_models
-    plot_histo(values=n_param, labels=models, x_label="model", y_label="number of parameters",
-               title="Parameters of the models", y_lim=[0, 100], path_file=output_param_graph)
+    plot_histo(values=n_param, labels=models, x_label="model", y_label="number of parameters(M)",
+               title="Parameters of the models (in milions)", y_lim=[0, 100], path_file=output_param_graph)
 
 
 

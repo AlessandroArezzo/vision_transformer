@@ -80,14 +80,14 @@ def get_transforms(augmentation, image_size):
     if augmentation:
         transforms = {
             'train': torchvision.transforms.Compose([
-                torchvision.transforms.Resize(int(int(image_size)), Image.BICUBIC),
+                torchvision.transforms.Resize((int(image_size*1.12), int(image_size*1.12)), Image.BICUBIC),
                 torchvision.transforms.RandomCrop(image_size, padding=4),
                 torchvision.transforms.RandomHorizontalFlip(),
                 torchvision.transforms.ToTensor(),
                 torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
             ]),
             'val': torchvision.transforms.Compose([
-                torchvision.transforms.Resize(int(int(image_size)), Image.BICUBIC),
+                torchvision.transforms.Resize((int(image_size*1.12), int(image_size*1.12)), Image.BICUBIC),
                 torchvision.transforms.RandomCrop(image_size, padding=4),
                 torchvision.transforms.RandomHorizontalFlip(),
                 torchvision.transforms.ToTensor(),
@@ -97,18 +97,18 @@ def get_transforms(augmentation, image_size):
     else:
         transforms = {
             'train': torchvision.transforms.Compose([
-                torchvision.transforms.Resize(int(int(image_size)), Image.BICUBIC),
+                torchvision.transforms.Resize((image_size, image_size), Image.BICUBIC),
                 torchvision.transforms.ToTensor(),
                 torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
             ]),
             'val': torchvision.transforms.Compose([
-                torchvision.transforms.Resize(int(int(image_size)), Image.BICUBIC),
+                torchvision.transforms.Resize((image_size, image_size), Image.BICUBIC),
                 torchvision.transforms.ToTensor(),
                 torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
             ]),
         }
     transforms['test'] = torchvision.transforms.Compose([
-                torchvision.transforms.Resize(int(int(image_size)), Image.BICUBIC),
+                torchvision.transforms.Resize((image_size, image_size), Image.BICUBIC),
                 torchvision.transforms.ToTensor(),
                 torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
             ])
@@ -123,10 +123,8 @@ def get_loader_from_dataset(dataset_name, root_path, image_size, batch_size_trai
     transforms = get_transforms(augmentation=augmentation, image_size=image_size)
     dataset_path = os.path.join(root_path, dataset_name)
     if dataset_name == "oxfordpets":
-        trainval_dataset = OxfordPetsDataset(dataset_path=dataset_path, mode="train",
-                                             transforms=transforms["train"])
-        test_dataset = OxfordPetsDataset(dataset_path=dataset_path, mode="test",
-                                            transforms=transforms["test"])
+        trainval_dataset = OxfordPetsDataset(dataset_path=dataset_path, mode="train", transforms=transforms["train"])
+        test_dataset = OxfordPetsDataset(dataset_path=dataset_path, mode="test", transforms=transforms["test"])
         train_loader, val_loader, test_loader = get_loader_splitting_val(train_dataset=trainval_dataset,
                                         test_dataset=test_dataset, batch_size_train=batch_size_train,
                                         batch_size_test=batch_size_test, n_cpu=n_cpu, val_ratio=val_ratio)
@@ -137,8 +135,8 @@ def get_loader_from_dataset(dataset_name, root_path, image_size, batch_size_trai
                                              transforms=transforms["val"])
         test_dataset = OxfordFlowersDataset(dataset_path=dataset_path, mode="test",
                                             transforms=transforms["test"])
-        train_loader = DataLoader(train_dataset, batch_size=batch_size_train,num_workers=n_cpu)
-        val_loader = DataLoader(val_dataset, batch_size=batch_size_train, num_workers=n_cpu)
+        train_loader = DataLoader(train_dataset, batch_size=batch_size_train,num_workers=n_cpu, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size_train, num_workers=n_cpu, shuffle=True)
         test_loader = DataLoader(test_dataset, batch_size=batch_size_test, shuffle=True, num_workers=n_cpu)
     elif dataset_name == "CIFAR-10" or dataset_name == "CIFAR-100":
         return LoadTorchData(root_path=dataset_path, download=True).load_dataset(dataset_name, batch_size_train,
@@ -160,10 +158,10 @@ def get_loader_splitting_val(train_dataset, test_dataset, batch_size_train, batc
     validation_loader = DataLoader(train_dataset, batch_size=batch_size_train,
                                                     sampler=validation_sampler,
                                                     num_workers=n_cpu)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size_test, shuffle=True,num_workers=n_cpu)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size_test, num_workers=n_cpu, shuffle=True)
     return train_loader, validation_loader, test_loader
 
-def evaluate(model, data_loader, device, acc_history=[], loss_history=[], mode="test"):
+def evaluate(model, data_loader, device, acc_history=[], loss_history=[], mode="test", eval_type="both"):
     model.eval()
     total_samples = len(data_loader.sampler)
     num_batch = len(data_loader)
@@ -181,10 +179,10 @@ def evaluate(model, data_loader, device, acc_history=[], loss_history=[], mode="
             correct_samples += pred.eq(target).sum()
     avg_loss = total_loss / num_batch
     accuracy = 100.0 * correct_samples / total_samples
-    if mode == "validation":
+    if mode == "val" or (eval_type == "test" and mode == "test"):
         loss_history.append(avg_loss)
         acc_history.append(accuracy)
-        sys.stdout.write(' %s: %.4f -- %s: %.2f \n' % ("val_loss",  avg_loss, "val_acc",  accuracy))
+        sys.stdout.write(' %s: %.4f -- %s: %.2f \n' % (mode+"_loss",  avg_loss, mode+"_acc",  accuracy))
     return avg_loss, accuracy
 
 
@@ -317,4 +315,4 @@ def count_model_parameters(model):
         if not parameter.requires_grad: continue
         param = parameter.numel()
         total_params += param
-    return total_params
+    return total_params / 1000000

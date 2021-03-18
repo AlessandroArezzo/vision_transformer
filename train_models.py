@@ -29,7 +29,7 @@ parser.add_argument('--n_cpu', type=int, default=16, help='n cpu to use for data
 parser.add_argument('--cuda', action='store_true', help='use GPU computation')
 parser.add_argument('--CUDA_VISIBLE_DEVICES', type=str, default="0", help='cuda device BUS ID')
 parser.add_argument('--data_augmentation',  action='store_true', help='use data augmentation')
-parser.add_argument('--evaluate_on_test',  action='store_true', help='evaluate also on data test during training')
+parser.add_argument('--eval_type',  type=str, default="both", help='type of evaluation (test, val, both)')
 parser.add_argument('--cos_lr_decay',  action='store_true', help='use cosine learning rate decay')
 parser.add_argument('--weight_decay',  type=float, default=0., help='weight decay to use')
 parser.add_argument('--optimizer',  type=str, default="adam", help='optimizer to use (adam or sgd)')
@@ -86,27 +86,27 @@ if __name__ == '__main__':
     for epoch in range(1, opt.n_epochs + 1):
         train_epoch(model=model, optimizer=optimizer, train_loader=train_loader, loss_history=train_loss_history,
                     acc_history=train_acc_history, device=device, epoch=epoch, n_epochs=opt.n_epochs)
-        _, _ = evaluate(model=model, data_loader=validation_loader, device=device, loss_history=val_loss_history,
-                    acc_history=val_acc_history, mode="validation")
-        if opt.evaluate_on_test:
-            test_loss, test_acc = evaluate(model=model, data_loader=test_loader, device=device, mode="test")
+        if opt.eval_type == "val" or opt.eval_type == "both":
+            _, _ = evaluate(model=model, data_loader=validation_loader, device=device, loss_history=val_loss_history,
+                        acc_history=val_acc_history, mode="val", eval_type=opt.eval_type)
+            update_graph(train_loss_history=train_loss_history, val_loss_history=val_loss_history,
+                         train_acc_history=train_acc_history, val_acc_history=val_acc_history, path=output_graph_path)
+        if opt.eval_type == "test" or opt.eval_type == "both":
+            test_loss, test_acc = evaluate(model=model, data_loader=test_loader, device=device, mode="test",
+                                           eval_type=opt.eval_type)
             if test_acc > best_test_acc:
                 best_test_loss = test_loss
                 best_test_acc = test_acc
                 best_epoch = epoch
                 best_time = time.time() - start_time
-        update_graph(train_loss_history=train_loss_history, val_loss_history=val_loss_history,
-                     train_acc_history=train_acc_history, val_acc_history=val_acc_history, path=output_graph_path)
         lr_scheduler.step(epoch-1)
         save(model.state_dict(), dump_file)
     exec_time = time.time() - start_time
     hours, rem = divmod(exec_time, 3600)
     minutes, seconds = divmod(rem, 60)
     print("Execution training time: {:0>2}:{:0>2}:{:05.2f}".format(int(hours), int(minutes), seconds))
-    if not opt.evaluate_on_test:
-        print("Evaluating model on data test ... ")
-        best_test_loss, best_test_acc = evaluate(model, test_loader, device)
-    save_result_on_csv(csv_path=opt.csv_result_path, dataset_name=opt.dataset_name, model_name=model_name,
-                       n_epochs=opt.n_epochs, execution_time=exec_time, optimizer=opt.optimizer, dropout=opt.dropout,
-                       lr=opt.lr, batch_size=opt.batch_size_train, best_test_loss=best_test_loss,
-                       best_test_acc=best_test_acc, best_epoch=best_epoch, best_time=best_time)
+    if opt.eval_type == "test" or opt.eval_type == "both":
+        save_result_on_csv(csv_path=opt.csv_result_path, dataset_name=opt.dataset_name, model_name=model_name,
+                           n_epochs=opt.n_epochs, execution_time=exec_time, optimizer=opt.optimizer, dropout=opt.dropout,
+                           lr=opt.lr, batch_size=opt.batch_size_train, best_test_loss=best_test_loss,
+                           best_test_acc=best_test_acc, best_epoch=best_epoch, best_time=best_time)
