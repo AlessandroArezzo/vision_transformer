@@ -38,7 +38,7 @@ class OxfordPetsDataset(CustomDataset):
         line = split_file.readlines()
         image_files, labels = [], []
         for line in line:
-            image_name, label = line.split(" ")[0]+".jpg", line.split(" ")[1]
+            image_name, label = line.split(" ")[0]+".jpg", line.split(" ")[2]
             image_files.append(os.path.join(images_path, image_name))
             labels.append(int(label)-1)
         return image_files, labels
