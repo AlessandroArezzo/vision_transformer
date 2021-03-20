@@ -1,13 +1,8 @@
 import csv
 import os
-import sys
 
-from torch.nn.functional import log_softmax
-from torch.nn import CrossEntropyLoss
 from matplotlib import pyplot as plt
 from torch.utils.data import SubsetRandomSampler, DataLoader
-from torch import no_grad, log_softmax
-from torch import max as torch_max
 import numpy as np
 from PIL import Image
 import torchvision
@@ -15,19 +10,36 @@ import pandas as pd
 
 from models.ViT_model import ViT
 
-from models.hybrid_ViT_model import ResnetHybridViT
-from dataset import OxfordPetsDataset, OxfordFlowersDataset
+from models.hybrid_ViT_model import Resnet50HybridViT
+from dataset import OxfordPetsDataset
 from dataset import LoadTorchData
 
-def get_ViT_name(model_type, patch_size=16, hybrid=False, backbone_name="resnet50"):
+def get_ViT_name(model_type, patch_size=16, hybrid=False):
+    """
+    Method that return the name of a ViT configuration
+    :param model_type: ViT-XS or ViT-S
+           patch_size: dimensions of the patch size in which to partition the images
+           hybrid: define if the model is an hybrid configuration or not
+    :return: name of ViT
+    """
     if hybrid:
-        #model_name = backbone_name+"+"+str(model_type)+"_"+str(patch_size)
-        model_name = backbone_name+"+"+str(model_type)
+        model_name = "resnet50+"+str(model_type)
     else:
         model_name = str(model_type)+"_"+str(patch_size)
     return model_name
 
-def get_ViT_model(type, image_size, patch_size, n_classes, n_channels, dropout, hybrid=False, backbone_name="resnet50"):
+def get_ViT_model(type, image_size, patch_size, n_classes, n_channels, dropout, hybrid=False):
+    """
+    Method that return the ViT model given its parameters
+    :param type: ViT-XS or ViT-S
+           image_size: images resolution
+           patch_size: dimensions of the patch size in which to partition the images
+           n_classes: number of classes
+           n_channels: number of image channels
+           dropout: dropout to use
+           hybrid: define if to use hybrid model or not
+    :return: ViT model
+    """
     assert type == "ViT-XS" or type == "ViT-S" or type == "ViT-B", \
         "ViT type error: type permitted are 'ViT-XS', 'ViT-S', 'ViT-B'"
     if type == "ViT-XS":
@@ -39,10 +51,9 @@ def get_ViT_model(type, image_size, patch_size, n_classes, n_channels, dropout, 
     elif type == "ViT-B":
         emb_dim, n_heads, depth, mlp_size = 768, 12, 12, 3072
     if hybrid:
-        model = ResnetHybridViT(image_size=image_size, num_classes=n_classes,
+        model = Resnet50HybridViT(image_size=image_size, num_classes=n_classes,
                     dim=emb_dim, depth=depth, num_heads=n_heads,
-                    feedforward_dim=mlp_size, dropout=dropout, backbone=backbone_name,
-                    downsample_ratio=patch_size, channels=n_channels)
+                    feedforward_dim=mlp_size, dropout=dropout)
     else:
         model = ViT(image_size=image_size, patch_size=patch_size, num_classes=n_classes,
                    channels=n_channels, dim=emb_dim, depth=depth, num_heads=n_heads,
@@ -50,28 +61,31 @@ def get_ViT_model(type, image_size, patch_size, n_classes, n_channels, dropout, 
     return model
 
 def get_resnet_model(resnet_type, n_classes):
-    assert resnet_type == "resnet18" or resnet_type == "resnet34" or resnet_type == "resnet50" or resnet_type == "resnet101" \
-           or resnet_type == "resnet152", "resnet type error"
+    """
+    Method that return the resnet model
+    :param type: resnet18 or resnet34
+           n_classes: number of classes
+    :return: resnet model
+    """
+    assert resnet_type == "resnet18" or resnet_type == "resnet34", \
+        "resnet type error: type permitted are 'resnet18', 'resent34'"
     if resnet_type == "resnet18":
         model = torchvision.models.resnet18(pretrained=False, num_classes=n_classes)
     elif resnet_type == "resnet34":
         model = torchvision.models.resnet34(pretrained=False, num_classes=n_classes)
-    elif resnet_type == "resnet50":
-        model = torchvision.models.resnet50(pretrained=False, num_classes=n_classes)
-    elif resnet_type == "resnet101":
-        model = torchvision.models.resnet101(pretrained=False, num_classes=n_classes)
-    elif resnet_type == "resnet152":
-        model = torchvision.models.resnet152(pretrained=False, num_classes=n_classes)
     return model
 
-def get_output_path(root_path, model_name, data_augmentation, dataset_name):
+def get_output_path(root_path, model_name, dataset_name):
+    """
+    Method that return the path for the graph and model output
+    :param root_path: path of the root directory
+           model_name: name of the model to train
+           dataset_name: name of the dataset to use
+    :return: paths of the directories where to save the graphs generated and the model trained
+    """
     root_path = os.path.join(root_path, dataset_name, model_name)
-    if data_augmentation:
-        root_path = os.path.join(root_path, "augmentation")
-    else:
-        root_path = os.path.join(root_path, "no_augmentation")
     graph_path = os.path.join(root_path, "graph")
-    model_path = os.path.join(root_path, "pretrained_models")
+    model_path = os.path.join(root_path, "model")
     if not os.path.exists(model_path):
         os.makedirs(model_path)
     if not os.path.exists(graph_path):
@@ -80,6 +94,13 @@ def get_output_path(root_path, model_name, data_augmentation, dataset_name):
     return graph_path, model_path
 
 def get_transforms(augmentation, image_size):
+    """
+    Method that return the transformation to apply to the images.
+    :param augmentation: define if use data augmentation techniques for the train and validation loader
+           image_size: images resolution
+    :return: dict of references to objects of the torchvision.transforms.Compose class. Dict contains transform to apply
+            for training, validation and test data loader
+    """
     if augmentation:
         transforms = {
             'train': torchvision.transforms.Compose([
@@ -119,7 +140,19 @@ def get_transforms(augmentation, image_size):
 
 def get_loader_from_dataset(dataset_name, root_path, image_size, batch_size_train=128, batch_size_test=128,
                               augmentation=True, val_ratio=0.2, n_cpu=8):
-    assert dataset_name == "oxfordpets" or dataset_name == "oxfordflowers" or dataset_name == "CIFAR-10" \
+    """
+    Method that return the torch data loader
+    :param dataset_name: name of the dataset to use
+           root_path: path of the root directory
+           image_size: images resolution
+           batch_size_train: batch size to use for train data loader
+           batch_size_test:  batch size to use for test data loader
+           augmentation: define if use data augmentation
+           val_ratio: percent of the data train to use for validation data loader
+           n_cpu: num workers to use
+    :return: torch loader for train, validation and test data
+    """
+    assert dataset_name == "oxfordpets" or dataset_name == "CIFAR-10" \
            or dataset_name == "CIFAR-100",\
         "custom dataset name error: you can actually select oxfordpets, oxfordflowers, CIFAR-10 or CIFAR-100"
     train_loader, val_loader, test_loader = None, None, None
@@ -128,26 +161,26 @@ def get_loader_from_dataset(dataset_name, root_path, image_size, batch_size_trai
     if dataset_name == "oxfordpets":
         trainval_dataset = OxfordPetsDataset(dataset_path=dataset_path, mode="train", transforms=transforms["train"])
         test_dataset = OxfordPetsDataset(dataset_path=dataset_path, mode="test", transforms=transforms["test"])
-        train_loader, val_loader, test_loader = get_loader_splitting_val(train_dataset=trainval_dataset,
+        train_loader, val_loader, test_loader = get_loader(train_dataset=trainval_dataset,
                                         test_dataset=test_dataset, batch_size_train=batch_size_train,
                                         batch_size_test=batch_size_test, n_cpu=n_cpu, val_ratio=val_ratio)
-    elif dataset_name == "oxfordflowers":
-        train_dataset = OxfordFlowersDataset(dataset_path=dataset_path, mode="train",
-                                             transforms=transforms["train"])
-        val_dataset = OxfordFlowersDataset(dataset_path=dataset_path, mode="val",
-                                             transforms=transforms["val"])
-        test_dataset = OxfordFlowersDataset(dataset_path=dataset_path, mode="test",
-                                            transforms=transforms["test"])
-        train_loader = DataLoader(train_dataset, batch_size=batch_size_train,num_workers=n_cpu, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=batch_size_train, num_workers=n_cpu, shuffle=True)
-        test_loader = DataLoader(test_dataset, batch_size=batch_size_test, shuffle=True, num_workers=n_cpu)
     elif dataset_name == "CIFAR-10" or dataset_name == "CIFAR-100":
         return LoadTorchData(root_path=dataset_path, download=True).load_dataset(dataset_name, batch_size_train,
                                                                                   batch_size_test, val_ratio, n_cpu,
                                                                                   transforms)
     return train_loader, val_loader, test_loader
 
-def get_loader_splitting_val(train_dataset, test_dataset, batch_size_train, batch_size_test, n_cpu, val_ratio):
+def get_loader(train_dataset, test_dataset, batch_size_train, batch_size_test, n_cpu, val_ratio):
+    """
+    Method that return torch data loader from train and test custom dataset object.
+    :param train_dataset: train custom dataset object
+           test_dataset: test cistom dataset object
+           batch_size_train: batch size to use for train data loader
+           batch_size_test:  batch size to use for test data loader
+           n_cpu: num workers to use
+           val_ratio: percent of the data train to use for validation data loader
+    :return: torch loader for train, validation and test data
+    """
     dataset_len = len(train_dataset)
     indices = list(range(dataset_len))
     val_len = int(np.floor(val_ratio * dataset_len))
@@ -164,34 +197,14 @@ def get_loader_splitting_val(train_dataset, test_dataset, batch_size_train, batc
     test_loader = DataLoader(test_dataset, batch_size=batch_size_test, num_workers=n_cpu, shuffle=True)
     return train_loader, validation_loader, test_loader
 
-def evaluate(model, data_loader, device, acc_history=[], loss_history=[], mode="test", eval_type="both"):
-    model.eval()
-    total_samples = len(data_loader.sampler)
-    num_batch = len(data_loader)
-    correct_samples = 0
-    total_loss = 0
-    criterion = CrossEntropyLoss()
-    with no_grad():
-        for data, target in data_loader:
-            data = data.to(device)
-            target = target.to(device)
-            output = log_softmax(model(data), dim=1)
-            loss = criterion(output, target)
-            _, pred = torch_max(output, dim=1)
-            total_loss += loss.item()
-            correct_samples += pred.eq(target).sum()
-    avg_loss = total_loss / num_batch
-    accuracy = 100.0 * correct_samples / total_samples
-    if mode == "val" or (eval_type == "test" and mode == "test"):
-        loss_history.append(avg_loss)
-        acc_history.append(accuracy)
-        sys.stdout.write(' %s: %.4f -- %s: %.2f \n' % (mode+"_loss",  avg_loss, mode+"_acc",  accuracy))
-    return avg_loss, accuracy
-
-
-def read_csv_from_path(file_path):
+def read_csv_from_path(csv_path):
+    """
+    Method that read a csv from path.
+    :param csv_path: path of the csv file
+    :return: dict that contains the data read
+    """
     data = {}
-    with open(file_path, 'r') as data_file:
+    with open(csv_path, 'r') as data_file:
         reader = csv.reader(data_file)
         for idx, row in enumerate(reader):
             if idx > 0:
@@ -206,6 +219,13 @@ def read_csv_from_path(file_path):
     return data
 
 def write_on_csv(data, out_df, csv_path):
+    """
+    Method that write data into a csv
+    :param data: data to write in csv
+           out_df: data for the csv header
+           csv_path: path where to write the csv file
+    :return:
+    """
     for dataset in data.keys():
         for model in data[dataset].keys():
             data_to_add = [dataset, model, data[dataset][model]["#epochs"],  data[dataset][model]["batch_size"],
@@ -219,6 +239,11 @@ def write_on_csv(data, out_df, csv_path):
     out_df.to_csv(csv_path, index=False, header=True)
 
 def get_time_in_format(millisecond):
+    """
+    Method that returns time in a readable format string.
+    :param millisecond: time to print
+    :return: string that contains time in a readable format
+    """
     hours, rem = divmod(millisecond, 3600)
     minutes, seconds = divmod(rem, 60)
     return "{:0>2}:{:0>2}:{:05.2f}".format(int(hours), int(minutes), seconds)
@@ -226,6 +251,12 @@ def get_time_in_format(millisecond):
 def save_result_on_csv(csv_path, model_name, dataset_name, batch_size,
                        lr, n_epochs, execution_time, optimizer, dropout, overwrite=False, best_test_loss=0, best_test_acc=0, best_epoch=0,
                        best_time=0):
+    """
+    Method that save currently training result in a csv file.
+    :param csv_path: path pof the csv where to write results
+           ...other data to save
+    :return:
+    """
     data = {}
     if not overwrite and os.path.isfile(csv_path):
         data = read_csv_from_path(csv_path)
@@ -242,33 +273,16 @@ def save_result_on_csv(csv_path, model_name, dataset_name, batch_size,
                                        'best_time': best_time, 'exec_time': execution_time}
     write_on_csv(data, out_df_scores, csv_path)
 
-def train_epoch(model, optimizer, train_loader, loss_history, acc_history, device, epoch, n_epochs):
-    total_samples = len(train_loader.dataset)
-    num_batch = len(train_loader)
-    model.train()
-    sum_losses = 0
-    total_correct_samples = 0
-    criterion = CrossEntropyLoss()
-    for i, (data, target) in enumerate(train_loader):
-        data = data.to(device)
-        target = target.to(device)
-        optimizer.zero_grad()
-        output = log_softmax(model(data), dim=1)
-        loss = criterion(output, target)
-        _, pred = torch_max(output, dim=1)
-        correct_samples = pred.eq(target).sum()
-        accuracy = 100.0 * correct_samples / len(data)
-        total_correct_samples += correct_samples
-        sum_losses += loss.item()
-        loss.backward()
-        optimizer.step()
-        sys.stdout.write('\rEpoch %03d/%03d [%03d/%03d] -- %s: %.4f -- %s: %.2f --' % (epoch, n_epochs, i+1,
-                                                                    num_batch, "train_loss",  loss.item(),
-                                                                    "train_acc",  accuracy))
-    loss_history.append(sum_losses/num_batch)
-    acc_history.append(100.0 * total_correct_samples / total_samples)
-
 def update_graph(train_loss_history, val_loss_history, train_acc_history, val_acc_history, path):
+    """
+    Method that update graphs with the trend of loss and accuracy on the train and validation data
+    :param train_loss_history, val_loss_history: list that contains loss value for train and validation detected
+                                                 at each epoch
+           train_acc_history, val_loss_hystory: list that contains mean accuracy for train and validation
+                                                detected at each epoch
+           path: path of the directory where to save the graphs
+    :return:
+    """
     losses_img_file = os.path.join(path, "pre_training_losses.png")
     acc_img_file = os.path.join(path, "pre_training_accuracy.png")
     epochs = np.arange(1, len(train_loss_history)+1)
@@ -290,32 +304,3 @@ def update_graph(train_loss_history, val_loss_history, train_acc_history, val_ac
     plt.legend()
     plt.savefig(acc_img_file)
     plt.close()
-
-class LambdaLR():
-    def __init__(self, n_epochs, offset, decay_start_epoch):
-        assert ((n_epochs - decay_start_epoch) > 0), "Decay must start before the training session ends!"
-        self.n_epochs = n_epochs
-        self.offset = offset
-        self.decay_start_epoch = decay_start_epoch
-
-    def step(self, epoch):
-        return 1.0 - max(0, epoch + self.offset - self.decay_start_epoch)/(self.n_epochs - self.decay_start_epoch)
-
-def plot_histo(values, labels, x_label, y_label, title, path_file, y_lim, color='blue'):
-    plt.bar(np.arange(len(labels)), values, color=color)
-    plt.xticks(np.arange(len(labels)), labels)
-    plt.xlabel(x_label)
-    plt.ylabel(y_label)
-    plt.title(title)
-    #plt.ylim(bottom=0)
-    figsize = (8, 6)
-    plt.savefig(path_file)
-    plt.close()
-
-def count_model_parameters(model):
-    total_params = 0
-    for name, parameter in model.named_parameters():
-        if not parameter.requires_grad: continue
-        param = parameter.numel()
-        total_params += param
-    return total_params / 1000000
