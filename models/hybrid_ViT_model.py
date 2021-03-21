@@ -1,6 +1,7 @@
 from einops import repeat
 from torch import nn, randn, cat
 from torchvision import models
+from torchvision.models.resnet import conv1x1
 
 from .ViT_model import MLPHead, TransformerEncoder
 
@@ -17,8 +18,9 @@ class HybridViT(nn.Module):
     mpl_head          reference to an object of class MLPHead
     """
 
-    def __init__(self, image_size, num_classes, dim, depth, num_heads, feedforward_dim, dropout=0.):
+    def __init__(self, image_size, num_classes, dim, depth, num_heads, feedforward_dim, dropout=0., downsample_ratio=1):
         super().__init__()
+        self.downsample = conv1x1(3, 3, downsample_ratio)
         self.backbone_model, self.features_dim = self.get_CNN_backbone()
         self.embedding_layer = HybridEmbeddingLayer(dim=dim, image_size=image_size, features_dim=self.features_dim)
         self.transformer = TransformerEncoder(dim=dim, depth=depth, num_heads=num_heads,
@@ -26,6 +28,7 @@ class HybridViT(nn.Module):
         self.mlp_head = MLPHead(dim=dim, n_classes=num_classes)
 
     def forward(self, x):
+        x = self.downsample(x)
         x = self.backbone_model(x)
         x = x.view(x.size(0), -1, self.features_dim)
         x = self.embedding_layer(x)
@@ -43,9 +46,10 @@ class Resnet50HybridViT(HybridViT):
 
     """
 
-    def __init__(self, image_size, num_classes, dim, depth, num_heads, feedforward_dim, dropout=0.):
+    def __init__(self, image_size, num_classes, dim, depth, num_heads, feedforward_dim, dropout=0., downsample_ratio=1):
         super().__init__(
-             image_size, num_classes, dim, depth, num_heads, feedforward_dim, dropout
+             #image_size, num_classes, dim, depth, num_heads, feedforward_dim, dropout
+             image_size/downsample_ratio, num_classes, dim, depth, num_heads, feedforward_dim, dropout, downsample_ratio
         )
 
     def get_CNN_backbone(self):
@@ -71,7 +75,7 @@ class HybridEmbeddingLayer(nn.Module):
 
     def __init__(self, dim, image_size, features_dim):
         super().__init__()
-        self.projection= nn.Linear(features_dim, dim)
+        self.projection = nn.Linear(features_dim, dim)
         self.cls = nn.Parameter(randn(1, 1, dim))
         self.num_features = int(image_size / 16.0) ** 2
         self.positions = nn.Parameter(randn(1, self.num_features + 1, dim))

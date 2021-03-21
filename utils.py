@@ -23,7 +23,8 @@ def get_ViT_name(model_type, patch_size=16, hybrid=False):
     :return: name of ViT
     """
     if hybrid:
-        model_name = "resnet50+"+str(model_type)
+        #model_name = "resnet50+"+str(model_type)
+        model_name = "resnet50+" + str(model_type)+"_"+str(patch_size)
     else:
         model_name = str(model_type)+"_"+str(patch_size)
     return model_name
@@ -54,7 +55,7 @@ def get_ViT_model(type, image_size, patch_size, n_classes, n_channels, dropout, 
     if hybrid:
         model = Resnet50HybridViT(image_size=image_size, num_classes=n_classes,
                     dim=emb_dim, depth=depth, num_heads=n_heads,
-                    feedforward_dim=mlp_size, dropout=dropout)
+                    feedforward_dim=mlp_size, dropout=dropout, downsample_ratio=patch_size)
     else:
         model = ViT(image_size=image_size, patch_size=patch_size, num_classes=n_classes,
                    channels=n_channels, dim=emb_dim, depth=depth, num_heads=n_heads,
