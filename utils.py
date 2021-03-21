@@ -40,10 +40,11 @@ def get_ViT_model(type, image_size, patch_size, n_classes, n_channels, dropout, 
            hybrid: define if to use hybrid model or not
     :return: ViT model
     """
-    assert type == "ViT-XS" or type == "ViT-S" or type == "ViT-B", \
-        "ViT type error: type permitted are 'ViT-XS', 'ViT-S', 'ViT-B'"
-    if type == "ViT-XS":
-        #emb_dim, n_heads, depth, mlp_size = 64, 4, 6, 128
+    assert type == "ViT-XS" or type == "ViT-S" or type == "ViT-XXS", \
+        "ViT type error: type permitted are 'ViT-XS', 'ViT-S', 'ViT-XXS'"
+    if type == "ViT-XXS":
+        emb_dim, n_heads, depth, mlp_size = 64, 4, 6, 128
+    elif type == "ViT-XS":
         emb_dim, n_heads, depth, mlp_size = 256, 8, 8, 512
     elif type == "ViT-S":
         emb_dim, n_heads, depth, mlp_size = 512, 8, 10, 768

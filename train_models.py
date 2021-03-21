@@ -114,11 +114,14 @@ if __name__ == '__main__':
                               hybrid=opt.hybrid)
     output_graph_path, dump_file = get_output_path(model_name=model_name, root_path=opt.output_root_path,
                                                    dataset_name=opt.dataset_name)
+    val_ratio = opt.val_ratio
+    if opt.eval_type == "test":
+        val_ratio = 0
     train_loader, validation_loader, test_loader = get_loader_from_dataset(dataset_name=opt.dataset_name,
                                     root_path=opt.dataset_path,
                                     batch_size_train=opt.batch_size_train, batch_size_test=opt.batch_size_test,
                                     image_size=opt.image_size, augmentation=opt.data_augmentation,
-                                    val_ratio=opt.val_ratio, n_cpu=opt.n_cpu)
+                                    val_ratio=val_ratio, n_cpu=opt.n_cpu)
     device = device("cuda:0" if opt.cuda else "cpu")
     if opt.cuda:
         os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
