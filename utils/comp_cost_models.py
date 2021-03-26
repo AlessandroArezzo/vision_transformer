@@ -76,9 +76,9 @@ if __name__ == '__main__':
 
     elif opt.graph_type == "comp_cost_results":
         print("Plot results graph...")
-        results_csv_path = "./data/models_results.csv"
+        results_csv_path = "../data/models_results.csv"
         comp_cost_csv_path = os.path.join(output_graph, "models_cost.csv")
-        graph_path = "./data/compare_cost_result.png"
+        graph_path = "../data/compare_cost_result.png"
         cost = {}
         with open(comp_cost_csv_path, 'r') as data_file:
             reader = csv.reader(data_file)

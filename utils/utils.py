@@ -11,8 +11,8 @@ import pandas as pd
 from models.ViT_model import ViT
 
 from models.hybrid_ViT_model import Resnet18HybridViT
-from dataset import OxfordPetsDataset
-from dataset import LoadTorchData
+from dataset.dataset import OxfordPetsDataset
+from dataset.dataset import LoadTorchData
 
 def get_ViT_name(model_type, patch_size=16, hybrid=False):
     """
