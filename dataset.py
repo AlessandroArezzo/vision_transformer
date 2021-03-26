@@ -21,7 +21,7 @@ class CustomDataset(Dataset):
         self.files_images, self.labels = self.get_images_and_labels()
 
     def __getitem__(self, index):
-        return self.transforms(Image.open(self.files_images[index % len(self.files_images)]).convert('RGB')), self.labels[index % len(self.files_images)]
+        return self.transforms(Image.open(self.files_images[index]).convert('RGB')), self.labels[index]
 
     def __len__(self):
         return len(self.files_images)

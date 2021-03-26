@@ -10,7 +10,7 @@ import pandas as pd
 
 from models.ViT_model import ViT
 
-from models.hybrid_ViT_model import Resnet50HybridViT
+from models.hybrid_ViT_model import Resnet18HybridViT
 from dataset import OxfordPetsDataset
 from dataset import LoadTorchData
 
@@ -23,8 +23,7 @@ def get_ViT_name(model_type, patch_size=16, hybrid=False):
     :return: name of ViT
     """
     if hybrid:
-        #model_name = "resnet50+"+str(model_type)
-        model_name = "resnet50+" + str(model_type)+"_"+str(patch_size)
+        model_name = "resnet18+"+str(model_type)
     else:
         model_name = str(model_type)+"_"+str(patch_size)
     return model_name
@@ -42,20 +41,15 @@ def get_ViT_model(type, image_size, patch_size, n_classes, n_channels, dropout, 
     :return: ViT model
     """
     assert type == "ViT-XS" or type == "ViT-S" or type == "ViT-XXS", \
-        "ViT type error: type permitted are 'ViT-XS', 'ViT-S', 'ViT-XXS'"
-    if type == "ViT-XXS":
-        emb_dim, n_heads, depth, mlp_size = 64, 4, 6, 128
-    elif type == "ViT-XS":
-        emb_dim, n_heads, depth, mlp_size = 256, 8, 8, 512
+        "ViT type error: type permitted are 'ViT-XS', 'ViT-S'"
+    if type == "ViT-XS":
+        emb_dim, n_heads, depth, mlp_size = 128, 8, 8, 384
     elif type == "ViT-S":
-        emb_dim, n_heads, depth, mlp_size = 512, 8, 10, 768
-
-    elif type == "ViT-B":
-        emb_dim, n_heads, depth, mlp_size = 768, 12, 12, 3072
+        emb_dim, n_heads, depth, mlp_size = 256, 8, 10, 768
     if hybrid:
-        model = Resnet50HybridViT(image_size=image_size, num_classes=n_classes,
+        model = Resnet18HybridViT(image_size=image_size, num_classes=n_classes,
                     dim=emb_dim, depth=depth, num_heads=n_heads,
-                    feedforward_dim=mlp_size, dropout=dropout, downsample_ratio=patch_size)
+                    feedforward_dim=mlp_size, dropout=dropout)
     else:
         model = ViT(image_size=image_size, patch_size=patch_size, num_classes=n_classes,
                    channels=n_channels, dim=emb_dim, depth=depth, num_heads=n_heads,

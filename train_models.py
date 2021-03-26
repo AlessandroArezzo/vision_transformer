@@ -11,7 +11,6 @@ from torch import max as torch_max
 
 from utils import get_ViT_model, get_output_path, get_loader_from_dataset, save_result_on_csv, \
     update_graph, get_ViT_name, get_resnet_model
-#from warmup_scheduler import GradualWarmupScheduler
 
 """
 Script that deals with training the models and evaluating their performance
@@ -132,8 +131,6 @@ if __name__ == '__main__':
     elif opt.optimizer == "sgd":
         optimizer = SGD(model.parameters(), lr=opt.lr, momentum=0.9, weight_decay=opt.weight_decay)
     lr_scheduler = lr_scheduler.CosineAnnealingLR(optimizer, opt.n_epochs-1)
-    #scheduler_cosine = lr_scheduler.CosineAnnealingLR(optimizer, opt.n_epochs-1)
-    #lr_scheduler = GradualWarmupScheduler(optimizer, multiplier=10, total_epoch=1, after_scheduler=scheduler_cosine)
     train_loss_history, val_loss_history, train_acc_history, val_acc_history = [], [], [], []
     best_test_loss, best_test_acc, best_epoch, best_time = 0.0, 0.0, opt.n_epochs + 1, 0
     start_time = time.time()

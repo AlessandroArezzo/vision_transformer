@@ -1,7 +1,6 @@
 from einops import repeat
 from torch import nn, randn, cat
 from torchvision import models
-from torchvision.models.resnet import conv1x1
 
 from .ViT_model import MLPHead, TransformerEncoder
 
@@ -18,9 +17,8 @@ class HybridViT(nn.Module):
     mpl_head          reference to an object of class MLPHead
     """
 
-    def __init__(self, image_size, num_classes, dim, depth, num_heads, feedforward_dim, dropout=0., downsample_ratio=1):
+    def __init__(self, image_size, num_classes, dim, depth, num_heads, feedforward_dim, dropout=0.):
         super().__init__()
-        self.downsample = conv1x1(3, 3, downsample_ratio)
         self.backbone_model, self.features_dim = self.get_CNN_backbone()
         self.embedding_layer = HybridEmbeddingLayer(dim=dim, image_size=image_size, features_dim=self.features_dim)
         self.transformer = TransformerEncoder(dim=dim, depth=depth, num_heads=num_heads,
@@ -28,7 +26,6 @@ class HybridViT(nn.Module):
         self.mlp_head = MLPHead(dim=dim, n_classes=num_classes)
 
     def forward(self, x):
-        x = self.downsample(x)
         x = self.backbone_model(x)
         x = x.view(x.size(0), -1, self.features_dim)
         x = self.embedding_layer(x)
@@ -39,24 +36,23 @@ class HybridViT(nn.Module):
     def get_CNN_backbone(self):
         raise NotImplementedError("Method must be implemented in the child classes!!")
 
-class Resnet50HybridViT(HybridViT):
+class Resnet18HybridViT(HybridViT):
     """
     This class extends the HybridViT to implements an hybrid ViT that extarct the features from the fourth
-    convolutional layer of a resnet50.
+    convolutional layer of a resnet18.
 
     """
 
-    def __init__(self, image_size, num_classes, dim, depth, num_heads, feedforward_dim, dropout=0., downsample_ratio=1):
+    def __init__(self, image_size, num_classes, dim, depth, num_heads, feedforward_dim, dropout=0.):
         super().__init__(
-             #image_size, num_classes, dim, depth, num_heads, feedforward_dim, dropout
-             image_size/downsample_ratio, num_classes, dim, depth, num_heads, feedforward_dim, dropout, downsample_ratio
+             image_size, num_classes, dim, depth, num_heads, feedforward_dim, dropout
         )
 
     def get_CNN_backbone(self):
-        model = models.resnet50(pretrained=False)
+        model = models.resnet18(pretrained=False)
         modules = list(model.children())[:-3]
         model = nn.Sequential(*modules)
-        features_dim = 1024
+        features_dim = 256
         return model, features_dim
 
 
