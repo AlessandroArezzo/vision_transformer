@@ -161,9 +161,11 @@ def get_loader_from_dataset(dataset_name, root_path, image_size, batch_size_trai
                                         test_dataset=test_dataset, batch_size_train=batch_size_train,
                                         batch_size_test=batch_size_test, n_cpu=n_cpu, val_ratio=val_ratio)
     elif dataset_name == "CIFAR-10" or dataset_name == "CIFAR-100":
-        return LoadTorchData(root_path=dataset_path, download=True).load_dataset(dataset_name, batch_size_train,
-                                                                                  batch_size_test, val_ratio, n_cpu,
-                                                                                  transforms)
+        train_dataset, test_dataset = LoadTorchData(root_path=dataset_path, download=True).load_dataset(
+                                                        dataset_name, transforms)
+        train_loader, validation_loader, test_loader = get_loader(train_dataset=train_dataset,
+                                                test_dataset=test_dataset, batch_size_train=batch_size_train,
+                                                batch_size_test=batch_size_test, n_cpu=n_cpu, val_ratio=val_ratio)
     return train_loader, val_loader, test_loader
 
 def get_loader(train_dataset, test_dataset, batch_size_train, batch_size_test, n_cpu, val_ratio):

@@ -9,7 +9,7 @@ from torch.nn import CrossEntropyLoss
 from torch.optim import Adam, lr_scheduler, SGD
 from torch import max as torch_max
 
-from utils import get_ViT_model, get_output_path, get_loader_from_dataset, save_result_on_csv, \
+from utils.utils import get_ViT_model, get_output_path, get_loader_from_dataset, save_result_on_csv, \
     update_graph, get_ViT_name, get_resnet_model
 
 """
@@ -25,7 +25,6 @@ parser.add_argument('--output_root_path', type=str, default="./data/", help='pat
 parser.add_argument('--n_classes', type=int, default=10, help='number of classes of the dataset')
 parser.add_argument('--n_channels', type=int, default=3, help='number of the color channel of the images in the dataset')
 parser.add_argument('--val_ratio', type=float, default=0.2, help='percent of data train to use for validation')
-parser.add_argument('--csv_result_path', type=str, default="./data/models_results.csv", help='csv results path')
 
 #Training info
 parser.add_argument('--n_epochs', type=int, default=100, help='number of the training epochs')
@@ -113,6 +112,7 @@ if __name__ == '__main__':
                               hybrid=opt.hybrid)
     output_graph_path, dump_file = get_output_path(model_name=model_name, root_path=opt.output_root_path,
                                                    dataset_name=opt.dataset_name)
+    csv_result_path = os.path.join(opt.output_root_path, "models_results.csv")
     val_ratio = opt.val_ratio
     if opt.eval_type == "test":
         val_ratio = 0
@@ -150,11 +150,11 @@ if __name__ == '__main__':
                 best_test_acc = test_acc
                 best_epoch = epoch
                 best_time = time.time() - start_time
-        lr_scheduler.step(epoch-1)
+        lr_scheduler.step()
         save(model.state_dict(), dump_file)
     exec_time = time.time() - start_time
     if opt.eval_type == "test" or opt.eval_type == "both":
-        save_result_on_csv(csv_path=opt.csv_result_path, dataset_name=opt.dataset_name, model_name=model_name,
+        save_result_on_csv(csv_path=csv_result_path, dataset_name=opt.dataset_name, model_name=model_name,
                            n_epochs=opt.n_epochs, execution_time=exec_time, optimizer=opt.optimizer, dropout=opt.dropout,
                            lr=opt.lr, batch_size=opt.batch_size_train, best_test_loss=best_test_loss,
                            best_test_acc=best_test_acc, best_epoch=best_epoch, best_time=best_time)

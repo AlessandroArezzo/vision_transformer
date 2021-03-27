@@ -2,7 +2,6 @@ from torch import cat, randn, einsum
 from torch import nn
 from einops import repeat, rearrange
 from einops.layers.torch import Rearrange
-from torch.nn.functional import pad
 
 class ViT(nn.Module):
     """
@@ -108,10 +107,10 @@ class MultiheadAttention(nn.Module):
                       the encoder dimension and apply a dropout if required
     """
 
-    def __init__(self, dim, n_heads=8, dim_head=64, dropout=0.):
+    def __init__(self, dim, n_heads=8, dropout=0.):
         super().__init__()
         self.n_heads = n_heads
-        inner_dim = dim_head * n_heads
+        inner_dim = 64 * n_heads
         self.scale = dim ** -0.5
         self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
         self.to_out = nn.Sequential(

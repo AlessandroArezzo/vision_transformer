@@ -1,6 +1,6 @@
 import os
+
 from torch.utils.data import Dataset
-import utils
 from PIL import Image
 import torchvision
 
@@ -73,37 +73,30 @@ class LoadTorchData():
         self.root_path = root_path
         self.download = download
 
-    def load_dataset(self, dataset_name, batch_size_train=100, batch_size_test=1000, val_ratio=0.3, n_cpu=8, transforms=None):
+    def load_dataset(self, dataset_name, transforms=None):
         """
-        Method that return the data loaders of a torchvision dataset
+        Method that return train and test data of a torchvision dataset
         :param dataset_name: name of the torchvision dataset
                batch_size_train: batch size to use for train data loader
                batch_size_test:  batch size to use for test data loader
                val_ratio: percent of the data train to use for validation data loader
                n_cpu: num workers to use
                transforms: transformation to apply
-        :return: train, validation and test torch data loader
+        :return: train and test dataset
         """
         assert dataset_name == "CIFAR-10" or dataset_name == "CIFAR-100", \
             "Pytorch datasets permitted are: CIFAR-10, CIFAR-100"
         if not os.path.exists(self.root_path):
             os.makedirs(self.root_path)
-        split_train_val = False
-        train_dataset, val_dataset, test_dataset = None, None, None
+        train_dataset, test_dataset = None, None
         if dataset_name == "CIFAR-10":
             train_dataset = torchvision.datasets.CIFAR10(self.root_path, train=True, download=self.download,
                                                    transform=transforms["train"])
             test_dataset = torchvision.datasets.CIFAR10(self.root_path, train=False, download=self.download,
                                                     transform=transforms["test"])
-            split_train_val = True
         elif dataset_name == "CIFAR-100":
             train_dataset = torchvision.datasets.CIFAR100(self.root_path, train=True, download=self.download,
                                                    transform=transforms["train"])
             test_dataset = torchvision.datasets.CIFAR100(self.root_path, train=False, download=self.download,
                                                      transform=transforms["test"])
-            split_train_val = True
-        if split_train_val:
-            train_loader, validation_loader, test_loader = utils.get_loader(train_dataset=train_dataset,
-                                                    test_dataset=test_dataset, batch_size_train=batch_size_train,
-                                                    batch_size_test=batch_size_test, n_cpu=n_cpu, val_ratio=val_ratio)
-        return train_loader, validation_loader, test_loader
+        return train_dataset, test_dataset
