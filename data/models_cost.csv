@@ -1,0 +1,8 @@
+model,MACs(G),#parameters
+ViT-XS_16,0.59 GMac,3.02 M  
+ViT-XS_32,0.16 GMac,3.29 M  
+ViT-S_16,1.85 GMac,9.45 M  
+ViT-S_32,0.5 GMac,10.0 M  
+resnet18+ViT-XS,1.98 GMac,5.74 M  
+resnet18+ViT-S,3.23 GMac,12.1 M  
+resnet18,1.82 GMac,11.18 M 
