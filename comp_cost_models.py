@@ -12,7 +12,7 @@ parser = argparse.ArgumentParser()
 opt = parser.parse_args()
 print(opt)
 
-output_path = "../data/"
+output_path = "data/"
 
 def mscatter(x,y,ax=None, m=None, **kw):
     import matplotlib.markers as mmarkers

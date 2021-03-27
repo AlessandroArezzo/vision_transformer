@@ -9,7 +9,7 @@ from torch.nn import CrossEntropyLoss
 from torch.optim import Adam, lr_scheduler, SGD
 from torch import max as torch_max
 
-from utils.utils import get_ViT_model, get_output_path, get_loader_from_dataset, save_result_on_csv, \
+from utils import get_ViT_model, get_output_path, get_loader_from_dataset, save_result_on_csv, \
     update_graph, get_ViT_name, get_resnet_model
 
 """
